@@ -1,5 +1,11 @@
 """LLM prompt templates."""
 
+from app.prompts.interview_prep import (
+    GENERATE_MOCK_QA_PROMPT,
+    GENERATE_QUESTIONS_TO_ASK_PROMPT,
+    GENERATE_SELF_INTRO_PROMPT,
+    SELECT_RELEVANT_STORIES_PROMPT,
+)
 from app.prompts.templates import (
     CRITICAL_TRUTHFULNESS_RULES,
     DEFAULT_IMPROVE_PROMPT_ID,
@@ -51,6 +57,10 @@ __all__ = [
     "DIFF_STRATEGY_INSTRUCTIONS",
     "SKILL_TARGET_PLAN_PROMPT",
     "GENERATE_TITLE_PROMPT",
+    "SELECT_RELEVANT_STORIES_PROMPT",
+    "GENERATE_MOCK_QA_PROMPT",
+    "GENERATE_SELF_INTRO_PROMPT",
+    "GENERATE_QUESTIONS_TO_ASK_PROMPT",
     "REQUIRED_FEATURE_PROMPT_PLACEHOLDERS",
     "validate_prompt_placeholders",
     "get_language_name",
