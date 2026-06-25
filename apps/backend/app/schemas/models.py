@@ -779,3 +779,186 @@ class ImproveDiffResult(BaseModel):
 
     changes: list[ResumeChange] = Field(default_factory=list)
     strategy_notes: str = Field(default="")
+
+
+# ---------------------------------------------------------------------------
+# Interview Prep models
+# ---------------------------------------------------------------------------
+
+
+class StarStoryCreateRequest(BaseModel):
+    """Request body to create a STAR story.
+
+    Tags default to an empty list; ``job_history_id`` is optional — when set,
+    the story is grouped under the corresponding JobHistory entry in the UI.
+    """
+
+    title: str
+    situation: str
+    task: str
+    action: str
+    result: str
+    tags: list[str] = Field(default_factory=list)
+    job_history_id: str | None = None
+
+
+class StarStoryUpdateRequest(BaseModel):
+    """Request body to partially update a STAR story.
+
+    All fields are optional — only provided (non-None) fields are applied
+    by the facade's ``model_dump(exclude_unset=True)`` path.
+    """
+
+    title: str | None = None
+    situation: str | None = None
+    task: str | None = None
+    action: str | None = None
+    result: str | None = None
+    tags: list[str] | None = None
+    job_history_id: str | None = None
+
+
+class StarStoryResponse(BaseModel):
+    """Response shape for a single STAR story."""
+
+    story_id: str
+    title: str
+    situation: str
+    task: str
+    action: str
+    result: str
+    tags: list[str]
+    job_history_id: str | None
+    created_at: str
+    updated_at: str
+
+
+class StarStoryListResponse(BaseModel):
+    """Response shape for a paginated (here: simple) list of STAR stories."""
+
+    request_id: str
+    data: list[StarStoryResponse]
+
+
+class JobHistoryCreateRequest(BaseModel):
+    """Request body to create a JobHistory entry."""
+
+    company: str
+    role: str
+    department: str | None = None
+    years: str
+    location: str | None = None
+    description: str
+    responsibilities: list[str] = Field(default_factory=list)
+    skills_used: list[str] = Field(default_factory=list)
+
+
+class JobHistoryUpdateRequest(BaseModel):
+    """Request body to partially update a JobHistory entry."""
+
+    company: str | None = None
+    role: str | None = None
+    department: str | None = None
+    years: str | None = None
+    location: str | None = None
+    description: str | None = None
+    responsibilities: list[str] | None = None
+    skills_used: list[str] | None = None
+
+
+class StarStorySummary(BaseModel):
+    """Lightweight STAR story summary embedded inside a JobHistory response."""
+
+    story_id: str
+    title: str
+    tags: list[str]
+
+
+class JobHistoryResponse(BaseModel):
+    """Response shape for a single JobHistory entry.
+
+    ``stories`` is a list of linked StarStory summaries (not the full story
+    text) — the UI requests the full story separately if the user opens it.
+    """
+
+    job_history_id: str
+    company: str
+    role: str
+    department: str | None
+    years: str
+    location: str | None
+    description: str
+    responsibilities: list[str]
+    skills_used: list[str]
+    stories: list[StarStorySummary] = Field(default_factory=list)
+    created_at: str
+    updated_at: str
+
+
+class JobHistoryListResponse(BaseModel):
+    """Response shape for listing JobHistory entries."""
+
+    request_id: str
+    data: list[JobHistoryResponse]
+
+
+class MockQAItem(BaseModel):
+    """A single mock-interview question and answer pair.
+
+    ``type`` controls the badge in the UI; ``story_id`` references the STAR
+    story the LLM grounded this answer in (or None if the LLM drew on the
+    JobHistory description only).
+    """
+
+    question: str
+    answer: str
+    story_id: str | None = None
+    type: Literal["behavioral", "technical", "situational", "motivational"]
+    follow_up: str | None = None
+
+
+class QuestionToAskItem(BaseModel):
+    """A candidate question to ask the interviewer.
+
+    ``category`` controls the section grouping; ``rationale`` is shown as
+    a tooltip explaining why this question is worth asking.
+    """
+
+    question: str
+    category: Literal["role", "team", "company", "culture", "growth"]
+    rationale: str
+    bold: bool = False
+
+
+class GenerateInterviewPrepRequest(BaseModel):
+    """Request body for the AI generation endpoint.
+
+    If ``star_story_ids`` is empty, the LLM auto-selects the most relevant
+    stories; if ``job_history_ids`` is None, all JobHistory rows are used.
+    """
+
+    job_id: str
+    star_story_ids: list[str] = Field(default_factory=list)
+    job_history_ids: list[str] | None = None
+    language: str = "en"
+
+
+class InterviewPrepResponse(BaseModel):
+    """Response shape for a generated (and persisted) interview prep bundle."""
+
+    prep_id: str
+    job_id: str
+    company_name: str
+    role_title: str
+    self_introduction: str
+    mock_qa: list[MockQAItem]
+    questions_to_ask: list[QuestionToAskItem]
+    star_story_ids: list[str]
+    created_at: str
+
+
+class InterviewPrepListResponse(BaseModel):
+    """Response shape for listing interview preps."""
+
+    request_id: str
+    data: list[InterviewPrepResponse]
