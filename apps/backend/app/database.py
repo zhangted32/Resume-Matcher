@@ -25,7 +25,16 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
 from app.db_engine import init_models_sync, make_async_engine, make_sync_engine
-from app.models import ApiKey, Application, Improvement, Job, Resume
+from app.models import (
+    ApiKey,
+    Application,
+    Improvement,
+    InterviewPrep,
+    Job,
+    JobHistory,
+    Resume,
+    StarStory,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -174,6 +183,51 @@ class Database:
             "position": row.position,
             "created_at": row.created_at,
             "updated_at": row.updated_at,
+        }
+
+    @staticmethod
+    def _star_story_to_dict(row: StarStory) -> dict[str, Any]:
+        return {
+            "story_id": row.story_id,
+            "title": row.title,
+            "situation": row.situation,
+            "task": row.task,
+            "action": row.action,
+            "result": row.result,
+            "tags": row.tags or [],
+            "job_history_id": row.job_history_id,
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }
+
+    @staticmethod
+    def _job_history_to_dict(row: JobHistory) -> dict[str, Any]:
+        return {
+            "job_history_id": row.job_history_id,
+            "company": row.company,
+            "role": row.role,
+            "department": row.department,
+            "years": row.years,
+            "location": row.location,
+            "description": row.description,
+            "responsibilities": row.responsibilities or [],
+            "skills_used": row.skills_used or [],
+            "created_at": row.created_at,
+            "updated_at": row.updated_at,
+        }
+
+    @staticmethod
+    def _interview_prep_to_dict(row: InterviewPrep) -> dict[str, Any]:
+        return {
+            "prep_id": row.prep_id,
+            "job_id": row.job_id,
+            "star_story_ids": row.star_story_ids or [],
+            "mock_qa": row.mock_qa or [],
+            "self_introduction": row.self_introduction,
+            "questions_to_ask": row.questions_to_ask or [],
+            "company_name": row.company_name,
+            "role_title": row.role_title,
+            "created_at": row.created_at,
         }
 
     # -- Resume operations --------------------------------------------------
@@ -725,6 +779,265 @@ class Database:
                         ApiKey(provider=provider, ciphertext=ciphertext, updated_at=now)
                     )
             session.commit()
+
+    # -- Star Story operations ----------------------------------------------
+
+    async def create_star_story(
+        self,
+        title: str,
+        situation: str,
+        task: str,
+        action: str,
+        result: str,
+        tags: list[str] | None = None,
+        job_history_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Create a new STAR story.
+
+        ``tags`` defaults to an empty list when None.
+        """
+        story_id = str(uuid4())
+        now = _now()
+        normalized_tags = list(tags) if tags else []
+        async with self._session() as session:
+            session.add(
+                StarStory(
+                    story_id=story_id,
+                    title=title,
+                    situation=situation,
+                    task=task,
+                    action=action,
+                    result=result,
+                    tags=normalized_tags,
+                    job_history_id=job_history_id,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            await session.commit()
+        fetched = await self.get_star_story(story_id)
+        assert fetched is not None
+        return fetched
+
+    async def get_star_story(self, story_id: str) -> dict[str, Any] | None:
+        """Get a STAR story by ID. Returns None if not found."""
+        async with self._session() as session:
+            row = await session.get(StarStory, story_id)
+            return self._star_story_to_dict(row) if row else None
+
+    async def list_star_stories(
+        self, tag: str | None = None, job_history_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """List STAR stories, ordered by most-recently-updated first.
+
+        ``tag`` filters via SQLite JSON-array substring containment (the column
+        stores ``["a", "b"]`` as a JSON string). Good enough for a single-user
+        personal library; not a substitute for a real JSON index.
+        """
+        async with self._session() as session:
+            stmt = select(StarStory).order_by(StarStory.updated_at.desc())
+            if tag:
+                stmt = stmt.where(StarStory.tags.like(f'%"{tag}"%'))
+            if job_history_id:
+                stmt = stmt.where(StarStory.job_history_id == job_history_id)
+            result = await session.execute(stmt)
+            rows = result.scalars().all()
+            return [self._star_story_to_dict(r) for r in rows]
+
+    async def update_star_story(
+        self, story_id: str, **fields: Any
+    ) -> dict[str, Any] | None:
+        """Update a STAR story's fields and bump ``updated_at``.
+
+        Only provided (non-None) keyword fields are applied. Returns None
+        if the story does not exist.
+        """
+        async with self._session() as session:
+            row = await session.get(StarStory, story_id)
+            if row is None:
+                return None
+            for key, value in fields.items():
+                if value is None:
+                    continue
+                if not hasattr(row, key):
+                    continue
+                setattr(row, key, value)
+            row.updated_at = _now()
+            await session.commit()
+            return self._star_story_to_dict(row)
+
+    async def delete_star_story(self, story_id: str) -> bool:
+        """Delete a STAR story. Returns True if a row was removed."""
+        async with self._session() as session:
+            row = await session.get(StarStory, story_id)
+            if row is None:
+                return False
+            await session.delete(row)
+            await session.commit()
+            return True
+
+    # -- Job History operations ----------------------------------------------
+
+    async def create_job_history(
+        self,
+        company: str,
+        role: str,
+        years: str,
+        description: str,
+        department: str | None = None,
+        location: str | None = None,
+        responsibilities: list[str] | None = None,
+        skills_used: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Create a new job history entry."""
+        job_history_id = str(uuid4())
+        now = _now()
+        async with self._session() as session:
+            session.add(
+                JobHistory(
+                    job_history_id=job_history_id,
+                    company=company,
+                    role=role,
+                    department=department,
+                    years=years,
+                    location=location,
+                    description=description,
+                    responsibilities=list(responsibilities) if responsibilities else [],
+                    skills_used=list(skills_used) if skills_used else [],
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+            await session.commit()
+        fetched = await self.get_job_history(job_history_id)
+        assert fetched is not None
+        return fetched
+
+    async def get_job_history(self, job_history_id: str) -> dict[str, Any] | None:
+        """Get a job history by ID with nested linked stories.
+
+        The response embeds a ``stories`` array of lightweight summaries
+        (id/title/tags) so the UI can render a "view stories" link without
+        a second round-trip.
+        """
+        async with self._session() as session:
+            row = await session.get(JobHistory, job_history_id)
+            if row is None:
+                return None
+            doc = self._job_history_to_dict(row)
+            stories_result = await session.execute(
+                select(StarStory).where(StarStory.job_history_id == job_history_id)
+            )
+            doc["stories"] = [
+                {
+                    "story_id": s.story_id,
+                    "title": s.title,
+                    "tags": s.tags or [],
+                }
+                for s in stories_result.scalars().all()
+            ]
+            return doc
+
+    async def list_job_histories(self) -> list[dict[str, Any]]:
+        """List all job histories, newest first."""
+        async with self._session() as session:
+            result = await session.execute(
+                select(JobHistory).order_by(JobHistory.created_at.desc())
+            )
+            rows = result.scalars().all()
+            return [self._job_history_to_dict(r) for r in rows]
+
+    async def update_job_history(
+        self, job_history_id: str, **fields: Any
+    ) -> dict[str, Any] | None:
+        """Update a job history entry. Same partial-update semantics as
+        ``update_star_story``.
+        """
+        async with self._session() as session:
+            row = await session.get(JobHistory, job_history_id)
+            if row is None:
+                return None
+            for key, value in fields.items():
+                if value is None:
+                    continue
+                if not hasattr(row, key):
+                    continue
+                setattr(row, key, value)
+            row.updated_at = _now()
+            await session.commit()
+            return self._job_history_to_dict(row)
+
+    async def delete_job_history(self, job_history_id: str) -> bool:
+        """Delete a job history. Stories linked to it are preserved
+        (the FK is ON DELETE SET NULL on the model side, applied at the
+        storage layer in a future migration).
+        """
+        async with self._session() as session:
+            row = await session.get(JobHistory, job_history_id)
+            if row is None:
+                return False
+            await session.delete(row)
+            await session.commit()
+            return True
+
+    # -- Interview Prep operations -------------------------------------------
+
+    async def create_interview_prep(
+        self,
+        job_id: str,
+        star_story_ids: list[str],
+        mock_qa: list[dict[str, Any]],
+        self_introduction: str,
+        questions_to_ask: list[dict[str, Any]],
+        company_name: str,
+        role_title: str,
+    ) -> dict[str, Any]:
+        """Persist a freshly generated interview prep bundle."""
+        prep_id = str(uuid4())
+        now = _now()
+        async with self._session() as session:
+            session.add(
+                InterviewPrep(
+                    prep_id=prep_id,
+                    job_id=job_id,
+                    star_story_ids=star_story_ids,
+                    mock_qa=mock_qa,
+                    self_introduction=self_introduction,
+                    questions_to_ask=questions_to_ask,
+                    company_name=company_name,
+                    role_title=role_title,
+                    created_at=now,
+                )
+            )
+            await session.commit()
+        fetched = await self.get_interview_prep(prep_id)
+        assert fetched is not None
+        return fetched
+
+    async def get_interview_prep(self, prep_id: str) -> dict[str, Any] | None:
+        """Get a single interview prep by ID. Returns None if missing."""
+        async with self._session() as session:
+            row = await session.get(InterviewPrep, prep_id)
+            return self._interview_prep_to_dict(row) if row else None
+
+    async def list_interview_preps(self) -> list[dict[str, Any]]:
+        """List all interview preps, newest first."""
+        async with self._session() as session:
+            result = await session.execute(
+                select(InterviewPrep).order_by(InterviewPrep.created_at.desc())
+            )
+            rows = result.scalars().all()
+            return [self._interview_prep_to_dict(r) for r in rows]
+
+    async def delete_interview_prep(self, prep_id: str) -> bool:
+        """Delete an interview prep. Returns True if a row was removed."""
+        async with self._session() as session:
+            row = await session.get(InterviewPrep, prep_id)
+            if row is None:
+                return False
+            await session.delete(row)
+            await session.commit()
+            return True
 
     # -- Stats / maintenance ------------------------------------------------
 

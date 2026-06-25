@@ -134,3 +134,71 @@ class ApiKey(Base):
     provider: Mapped[str] = mapped_column(String, primary_key=True)
     ciphertext: Mapped[str] = mapped_column(Text)
     updated_at: Mapped[str] = mapped_column(String, default=_utcnow_iso)
+
+
+class StarStory(Base):
+    """A STAR-format behavioral interview story.
+
+    Independent from the resume's workExperience — used as source material
+    for AI-generated mock interview Q&A. Optionally linked to a JobHistory
+    entry via ``job_history_id`` (nullable FK with ON DELETE SET NULL).
+    """
+
+    __tablename__ = "star_stories"
+
+    story_id: Mapped[str] = mapped_column(String, primary_key=True)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    situation: Mapped[str] = mapped_column(Text, nullable=False)
+    task: Mapped[str] = mapped_column(Text, nullable=False)
+    action: Mapped[str] = mapped_column(Text, nullable=False)
+    result: Mapped[str] = mapped_column(Text, nullable=False)
+    tags: Mapped[list] = mapped_column(JSON, default=list)
+    job_history_id: Mapped[str | None] = mapped_column(
+        String, nullable=True, index=True
+    )
+    created_at: Mapped[str] = mapped_column(String, default=_utcnow_iso)
+    updated_at: Mapped[str] = mapped_column(String, default=_utcnow_iso)
+
+
+class JobHistory(Base):
+    """A detailed job history record.
+
+    Independent from the resume's workExperience — users may have more detail
+    here than what appears on the resume. Each record can be linked to zero
+    or more StarStory rows.
+    """
+
+    __tablename__ = "job_histories"
+
+    job_history_id: Mapped[str] = mapped_column(String, primary_key=True)
+    company: Mapped[str] = mapped_column(String, nullable=False)
+    role: Mapped[str] = mapped_column(String, nullable=False)
+    department: Mapped[str | None] = mapped_column(String, nullable=True)
+    years: Mapped[str] = mapped_column(String, nullable=False)
+    location: Mapped[str | None] = mapped_column(String, nullable=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    responsibilities: Mapped[list] = mapped_column(JSON, default=list)
+    skills_used: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[str] = mapped_column(String, default=_utcnow_iso)
+    updated_at: Mapped[str] = mapped_column(String, default=_utcnow_iso)
+
+
+class InterviewPrep(Base):
+    """Generated interview preparation materials for a single job.
+
+    Persisted once after LLM generation so users can re-view without
+    re-running the LLM. ``mock_qa`` and ``questions_to_ask`` are stored as
+    raw JSON arrays (see schemas.models for the typed shape).
+    """
+
+    __tablename__ = "interview_preps"
+
+    prep_id: Mapped[str] = mapped_column(String, primary_key=True)
+    job_id: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    star_story_ids: Mapped[list] = mapped_column(JSON, default=list)
+    mock_qa: Mapped[list] = mapped_column(JSON, default=list)
+    self_introduction: Mapped[str | None] = mapped_column(Text, nullable=True)
+    questions_to_ask: Mapped[list] = mapped_column(JSON, default=list)
+    company_name: Mapped[str | None] = mapped_column(String, nullable=True)
+    role_title: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[str] = mapped_column(String, default=_utcnow_iso)
