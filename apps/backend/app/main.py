@@ -23,9 +23,12 @@ from app.routers import (
     config_router,
     enrichment_router,
     health_router,
+    interview_preps_router,
+    job_histories_router,
     jobs_router,
     resume_wizard_router,
     resumes_router,
+    star_stories_router,
 )
 
 
@@ -94,6 +97,9 @@ app.include_router(jobs_router, prefix="/api/v1")
 app.include_router(enrichment_router, prefix="/api/v1")
 app.include_router(applications_router, prefix="/api/v1")
 app.include_router(resume_wizard_router, prefix="/api/v1")
+app.include_router(star_stories_router, prefix="/api/v1")
+app.include_router(job_histories_router, prefix="/api/v1")
+app.include_router(interview_preps_router, prefix="/api/v1")
 
 
 @app.get("/")

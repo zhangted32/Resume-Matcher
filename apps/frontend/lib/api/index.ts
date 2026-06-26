@@ -44,6 +44,37 @@ export {
   type ResumeWizardTurnResponse,
 } from './resume-wizard';
 
+// Interview Prep operations
+export {
+  fetchStarStories,
+  fetchStarStory,
+  createStarStory,
+  updateStarStory,
+  deleteStarStory,
+  fetchJobHistories,
+  fetchJobHistory,
+  createJobHistory,
+  updateJobHistory,
+  deleteJobHistory,
+  fetchInterviewPreps,
+  fetchInterviewPrep,
+  generateInterviewPrep,
+  deleteInterviewPrep,
+  fetchJobs,
+  type StarStory,
+  type StarStoryCreateRequest,
+  type StarStoryUpdateRequest,
+  type JobHistory,
+  type JobHistoryCreateRequest,
+  type JobHistoryUpdateRequest,
+  type InterviewPrep,
+  type GenerateInterviewPrepRequest,
+  type MockQA,
+  type QuestionToAsk,
+  type QuestionCategory,
+  type QuestionType,
+} from './interview-prep';
+
 // Config operations
 export {
   fetchLlmConfig,
